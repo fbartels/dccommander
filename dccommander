@@ -1,0 +1,96 @@
+#!/bin/bash
+
+set -e
+[ "$DEBUG" ] && set -x
+
+USAGE="USAGE: $(basename "$0") [run|edit] <docker-compose-service>"
+COMMANDER_FILES_PATH="${GOSS_FILES_PATH:-.}"
+
+info() {
+    echo -e "INFO: $*" >&2;
+}
+error() {
+    echo -e "ERROR: $*" >&2;
+    [[ -e "$service" ]] && docker logs "$service"
+    exit 1;
+}
+
+cleanup() {
+    set +e
+    { kill "$log_pid" && wait "$log_pid"; } 2> /dev/null
+    [ "$DEBUG" ] || rm -rf "$tmp_dir"
+    if [[ -n "$service" ]]; then
+        #TODO setting for down -v vs stop?
+        #info "Deleting container"
+        #docker-compose down -v > /dev/null
+        info "Stopping container"
+        echo "Deleting $(docker rm -f "$service")"
+        docker-compose stop > /dev/null
+    fi
+}
+
+run(){
+    # Copy in commander
+    cp "${COMMANDER_PATH}" "$tmp_dir/commander"
+    chmod 755 "$tmp_dir/commander"
+    [[ -e "${COMMANDER_FILES_PATH}/${COMMANDER_FILE:-commander.yaml}" ]] && install -m ugo+rw "${COMMANDER_FILES_PATH}/${COMMANDER_FILE:-commander.yaml}" "$tmp_dir"
+
+    info "Starting docker container"
+    docker-compose run -d -T --name "$service" -v "$tmp_dir:/commander" "$service"
+    docker logs -f "$service" > "$tmp_dir/docker_output.log" 2>&1 &
+    log_pid="$!"
+    info "Container name: $service"
+}
+
+get_docker_file() {
+    set +e
+    if docker exec "$service" sh -c "test -e $1" > /dev/null; then
+        mkdir -p "${COMMANDER_FILES_PATH}"
+        info "Copied '$1' from container to '${COMMANDER_FILES_PATH}'"
+        docker cp "$service:$1" "${COMMANDER_FILES_PATH}"
+    fi
+    set -e
+}
+
+# Main
+tmp_dir=$(mktemp -d /tmp/tmp.XXXXXXXXXX)
+chmod 777 "$tmp_dir"
+# shellcheck disable=SC2154
+trap 'ret=$?; cleanup; info "Test ran for a total of $SECONDS seconds"; exit $ret' EXIT
+service="$2"
+
+if [[ ! -f docker-compose.yaml && ! -f docker-compose.yml ]]; then
+    echo "no docker-compose file found in ."
+    exit 1
+fi
+
+state=$(docker inspect --format '{{.State.Status}}' "$service" 2> /dev/null || true)
+if [[ "$state" == running ]]; then
+    docker rm -f "$service" > /dev/null
+elif [[ "$state" == exited ]]; then
+    docker rm "$service" > /dev/null
+fi
+
+COMMANDER_PATH="${COMMANDER_PATH:-$(command -v commander 2> /dev/null || true)}"
+[[ "$COMMANDER_PATH" ]] || { error "Couldn't find commander installation, please set COMMANDER_PATH to it"; }
+[[ "${COMMANDER_OPTS+x}" ]] || COMMANDER_OPTS="-h"
+
+case "$1" in
+    run)
+        run "$@"
+        info "Container health"
+        if ! docker top "$service"; then
+            error "The container failed to start"
+        fi
+        info "Running Tests"
+        docker exec "$service" sh -c "/commander/commander test $COMMANDER_OPTS"
+        ;;
+    edit)
+        run "$@"
+        info "Run commander add to add resources"
+        docker exec -it "$service" sh -c 'cd /commander; PATH="/commander:$PATH" exec sh'
+        get_docker_file "/commander/commander.yaml"
+        ;;
+    *)
+        error "$USAGE"
+esac
