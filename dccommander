@@ -73,7 +73,7 @@ fi
 
 COMMANDER_PATH="${COMMANDER_PATH:-$(command -v commander 2> /dev/null || true)}"
 [[ "$COMMANDER_PATH" ]] || { error "Couldn't find commander installation, please set COMMANDER_PATH to it"; }
-[[ "${COMMANDER_OPTS+x}" ]] || COMMANDER_OPTS="-h"
+[[ "${COMMANDER_OPTS+x}" ]] || COMMANDER_OPTS="--verbose --concurrent 1"
 
 case "$1" in
     run)
@@ -83,7 +83,7 @@ case "$1" in
             error "The container failed to start"
         fi
         info "Running Tests"
-        docker exec "$service" sh -c "/commander/commander test $COMMANDER_OPTS"
+        docker exec "$service" sh -c "cd /commander && /commander/commander test $COMMANDER_OPTS"
         ;;
     edit)
         run "$@"
