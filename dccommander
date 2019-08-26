@@ -4,7 +4,7 @@ set -e
 [ "$DEBUG" ] && set -x
 
 USAGE="USAGE: $(basename "$0") [run|edit] <docker-compose-service>"
-COMMANDER_FILES_PATH="${GOSS_FILES_PATH:-.}"
+COMMANDER_FILES_PATH="${COMMANDER_FILES_PATH:-.}"
 
 info() {
     echo -e "INFO: $*" >&2;
