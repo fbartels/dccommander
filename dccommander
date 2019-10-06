@@ -36,7 +36,7 @@ run(){
     [[ -e "${COMMANDER_FILES_PATH}/${COMMANDER_FILE:-commander.yaml}" ]] && install -m ugo+rw "${COMMANDER_FILES_PATH}/${COMMANDER_FILE:-commander.yaml}" "$tmp_dir"
 
     info "Starting docker container"
-    docker-compose run -d --rm -T --name "$service" -v "$tmp_dir:/commander" "$service" sleep infinity
+    docker-compose run -d --rm -T --name "$service" -v "$tmp_dir:/commander" "$service" sleep 1d
     container_pid="$!"
     docker logs -f "$service" > "$tmp_dir/docker_output.log" 2>&1 &
     log_pid="$!"
