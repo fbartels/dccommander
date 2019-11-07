@@ -8,4 +8,16 @@
 
 ### Edit
 
+### Debugging execution
+
+Specifying the `DEBUG` in the environment not only runs `dccommander` with `set +x`, but also prevents cleaning out the tempdir with the logfile of the container startup.
+
+```bash
+DEBUG=true  dccommander edit kopano_konnect
+```
+
 ### Environment vars and defaults
+
+COMMANDER_OPTS="--concurrent 1"
+
+COMMANDER_FILES_PATH=konnect
