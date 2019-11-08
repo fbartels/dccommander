@@ -34,10 +34,10 @@ run(){
     cp "${COMMANDER_PATH}" "$tmp_dir/commander"
     chmod 755 "$tmp_dir/commander"
     [[ -e "${COMMANDER_FILES_PATH}/${COMMANDER_FILE:-commander.yaml}" ]] && install -m ugo+rw "${COMMANDER_FILES_PATH}/${COMMANDER_FILE:-commander.yaml}" "$tmp_dir"
+    [[ -e "${COMMANDER_FILES_PATH}/test-helper.sh" ]] && install -m ugo+rwx "${COMMANDER_FILES_PATH}/test-helper.sh" "$tmp_dir"
 
     info "Starting docker container"
     docker-compose run -d --rm -T --name "$service" -v "$tmp_dir:/commander" "$service" sleep 1d
-    container_pid="$!"
     docker logs -f "$service" > "$tmp_dir/docker_output.log" 2>&1 &
     log_pid="$!"
     info "Container name: $service"
@@ -84,12 +84,12 @@ case "$1" in
             error "The container failed to start"
         fi
         info "Running Tests"
-        docker exec "$service" sh -c "cd /commander && /commander/commander test $COMMANDER_OPTS"
+        docker exec "$service" sh -c "cd /commander && PATH=/commander:$PATH && /commander/commander test $COMMANDER_OPTS"
         ;;
     edit)
         run "$@"
         info "Run commander add to add resources"
-        docker exec -it "$service" sh -c 'cd /commander; PATH="/commander:$PATH" exec sh'
+        docker exec -it "$service" sh -c 'cd /commander && PATH="/commander:$PATH" exec sh'
         get_docker_file "/commander/commander.yaml"
         ;;
     *)
